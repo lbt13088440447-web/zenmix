@@ -320,6 +320,7 @@ function SequencerView({ initRef }: { initRef: React.MutableRefObject<boolean> }
   const [bpm, setBpm] = useState(engine.sequencerConfig.bpm);
   const [grid, setGrid] = useState<boolean[][]>(engine.sequencerConfig.grid);
   const [currentStep, setCurrentStep] = useState(0);
+  const [trackVolumes, setTrackVolumes] = useState(engine.sequencerConfig.volumes);
 
   useEffect(() => {
     engine.sequencerConfig.onStepCallback = (step) => {
@@ -411,10 +412,24 @@ function SequencerView({ initRef }: { initRef: React.MutableRefObject<boolean> }
           {/* Grid Rows */}
           {grid.map((row, rIndex) => (
             <div key={`row-${rIndex}`} className="flex items-center gap-4 bg-black/20 p-2 rounded-xl group/row hover:bg-black/40 transition-colors">
-              <div className="w-20 text-right pr-2">
+               <div className="w-24 flex flex-col gap-2 justify-center pl-2">
                 <span className="text-xs font-semibold tracking-wider uppercase text-white/50 group-hover/row:text-white/80 transition-colors">
                   {engine.sequencerConfig.labels[rIndex]}
                 </span>
+                <input 
+                  type="range"
+                  min="0"
+                  max="1.5"
+                  step="0.01"
+                  value={trackVolumes[rIndex]}
+                  onChange={(e) => {
+                    const newVols = [...trackVolumes];
+                    newVols[rIndex] = parseFloat(e.target.value);
+                    setTrackVolumes(newVols);
+                    engine.setSequencerTrackVolume(rIndex, newVols[rIndex]);
+                  }}
+                  className="w-full h-1 bg-white/10 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-400 cursor-pointer"
+                />
               </div>
               <div className="flex flex-1 gap-1.5">
                 {row.map((cell, cIndex) => {

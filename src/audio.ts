@@ -77,6 +77,7 @@ export class AudioEngine {
       new Array(16).fill(false)
     ],
     labels: ['沉音 (Kick)', '木鱼 (Wood)', '沙锤 (Shaker)', '长铃 (Mallet)'],
+    volumes: [0.8, 0.8, 0.8, 0.8],
     onStepCallback: null as ((step: number) => void) | null,
     isPlaying: false
   };
@@ -84,6 +85,7 @@ export class AudioEngine {
   public analyser: AnalyserNode | null = null;
   public get isPlayingState() { return this.isPlaying || this.sequencerConfig.isPlaying; }
   private seqGain: GainNode | null = null;
+  private seqTrackGains: GainNode[] = [];
   private seqCurrentStep = 0;
   private seqNextNoteTime = 0;
   private seqTimerID: any = null;
@@ -107,6 +109,14 @@ export class AudioEngine {
     this.seqGain = this.ctx.createGain();
     this.seqGain.gain.value = 0.6;
     this.seqGain.connect(this.masterGain);
+
+    this.seqTrackGains = [];
+    for (let i = 0; i < 4; i++) {
+        const gain = this.ctx.createGain();
+        gain.gain.value = this.sequencerConfig.volumes[i];
+        gain.connect(this.seqGain);
+        this.seqTrackGains.push(gain);
+    }
 
     this.setupTracks();
   }
@@ -667,10 +677,10 @@ export class AudioEngine {
        }, Math.max(timeToWait, 0));
     }
 
-    if (this.sequencerConfig.grid[0][stepNumber]) playKick(this.ctx!, time, this.seqGain!);
-    if (this.sequencerConfig.grid[1][stepNumber]) playSnare(this.ctx!, time, this.seqGain!);
-    if (this.sequencerConfig.grid[2][stepNumber]) playHihat(this.ctx!, time, this.seqGain!);
-    if (this.sequencerConfig.grid[3][stepNumber]) playPerc(this.ctx!, time, this.seqGain!);
+    if (this.sequencerConfig.grid[0][stepNumber]) playKick(this.ctx!, time, this.seqTrackGains[0]!);
+    if (this.sequencerConfig.grid[1][stepNumber]) playSnare(this.ctx!, time, this.seqTrackGains[1]!);
+    if (this.sequencerConfig.grid[2][stepNumber]) playHihat(this.ctx!, time, this.seqTrackGains[2]!);
+    if (this.sequencerConfig.grid[3][stepNumber]) playPerc(this.ctx!, time, this.seqTrackGains[3]!);
   }
 
   private seqScheduler() {
@@ -700,6 +710,13 @@ export class AudioEngine {
   setSequencerVolume(volume: number) {
     if (this.seqGain && this.ctx) {
       this.seqGain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  setSequencerTrackVolume(index: number, volume: number) {
+    this.sequencerConfig.volumes[index] = volume;
+    if (this.seqTrackGains[index] && this.ctx) {
+      this.seqTrackGains[index].gain.setTargetAtTime(volume, this.ctx.currentTime, 0.1);
     }
   }
 }
