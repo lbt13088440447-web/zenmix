@@ -1,0 +1,6 @@
+{
+  "name": "ZenMix",
+  "description": "A meditation and mindfulness music generator where you combine ethereal tracks to create unique relaxing soundscapes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
