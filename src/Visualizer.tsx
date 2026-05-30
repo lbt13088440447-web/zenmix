@@ -91,13 +91,52 @@ export function Visualizer() {
     const dataArray = new Uint8Array(256);
 
     let reqId: number;
+    let smoothedBass = 0;
+    
     const render = () => {
       ctx.clearRect(0, 0, w, h);
       
+      let bass = 0;
       if (engine.analyser && engine.isPlayingState) {
         engine.analyser.getByteFrequencyData(dataArray);
+        // Calculate average bass level (first few frequency bins)
+        for(let i = 0; i < 8; i++) {
+           bass += dataArray[i];
+        }
+        bass = bass / (8 * 255.0);
       } else {
         dataArray.fill(0);
+      }
+
+      smoothedBass = smoothedBass * 0.8 + bass * 0.2;
+
+      ctx.save();
+      // Apply global pulsing scale based on bass
+      const globalScale = 1 + smoothedBass * 0.08;
+      ctx.translate(w/2, h/2);
+      ctx.scale(globalScale, globalScale);
+      ctx.translate(-w/2, -h/2);
+
+      // Draw rhythmic background glow
+      if (smoothedBass > 0.05) {
+          const grad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.max(w, h) * 0.6 * (1 + smoothedBass));
+          grad.addColorStop(0, `rgba(139, 92, 246, ${smoothedBass * 0.15})`);
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+
+          // Draw rhythmic central rings
+          ctx.beginPath();
+          ctx.arc(w/2, h/2, Math.min(w,h) * 0.25 * (1 + smoothedBass * 0.3), 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(192, 132, 252, ${smoothedBass * 0.3})`;
+          ctx.lineWidth = 0.5 + smoothedBass * 1.2;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(w/2, h/2, Math.min(w,h) * 0.35 * (1 + smoothedBass * 0.5), 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(99, 102, 241, ${smoothedBass * 0.15})`;
+          ctx.lineWidth = 0.3 + smoothedBass * 0.6;
+          ctx.stroke();
       }
 
       particles.forEach((p, i) => {
@@ -139,6 +178,7 @@ export function Visualizer() {
           }
         }
       });
+      ctx.restore();
 
       reqId = requestAnimationFrame(render);
     };

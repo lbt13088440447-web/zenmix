@@ -5,9 +5,9 @@ function playKick(ctx: AudioContext, time: number, gainNode: GainNode) {
   gain.connect(gainNode);
   osc.type = 'sine';
   osc.frequency.setValueAtTime(100, time);
-  osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.3);
+  osc.frequency.exponentialRampToValueAtTime(35, time + 0.3);
   gain.gain.setValueAtTime(0.8, time);
-  gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
   osc.start(time);
   osc.stop(time + 0.3);
 }
@@ -21,7 +21,7 @@ function playSnare(ctx: AudioContext, time: number, gainNode: GainNode) {
   osc.frequency.setValueAtTime(600, time);
   osc.frequency.exponentialRampToValueAtTime(400, time + 0.05);
   gain.gain.setValueAtTime(0.6, time);
-  gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
   osc.start(time);
   osc.stop(time + 0.1);
 }
@@ -38,11 +38,12 @@ function playHihat(ctx: AudioContext, time: number, gainNode: GainNode) {
   bandpass.frequency.value = 6000;
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.2, time);
-  gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
   noise.connect(bandpass);
   bandpass.connect(gain);
   gain.connect(gainNode);
   noise.start(time);
+  noise.stop(time + 0.05);
 }
 
 function playPerc(ctx: AudioContext, time: number, gainNode: GainNode) {
@@ -97,13 +98,22 @@ export class AudioEngine {
     this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = 1;
+    this.masterGain.gain.value = 0.85;
+
+    // Use a DynamicsCompressorNode as a brickwall limiter to prevent clipping (bàoyīn/电流麦)
+    const compressor = this.ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-1.0, this.ctx.currentTime); // Threshold -1.0dB to catch heavy spikes
+    compressor.knee.setValueAtTime(12, this.ctx.currentTime); // Quick but slightly rounded transition
+    compressor.ratio.setValueAtTime(20.0, this.ctx.currentTime); // Brickwall limiting ratio
+    compressor.attack.setValueAtTime(0.003, this.ctx.currentTime); // Ultra fast attack is crucial to kill pops instantly
+    compressor.release.setValueAtTime(0.15, this.ctx.currentTime); // Decent release for high transparency
 
     this.analyser = this.ctx.createAnalyser();
     this.analyser.fftSize = 512;
     this.analyser.smoothingTimeConstant = 0.8;
     
-    this.masterGain.connect(this.analyser);
+    this.masterGain.connect(compressor);
+    compressor.connect(this.analyser);
     this.analyser.connect(this.ctx.destination);
 
     this.seqGain = this.ctx.createGain();
@@ -608,9 +618,124 @@ export class AudioEngine {
       (g as any).customStop = () => clearTimeout(interval);
       return g;
     };
+
+    // 11. AI Generated Ambient Track (From Mic Buffer)
+    this.tracks['ai_gen'] = () => {
+      const g = this.ctx!.createGain();
+      g.gain.value = 0.6;
+      
+      const convolver = this.ctx!.createConvolver();
+      // Generate a massive impulse response for ethereal reverb
+      const length = this.ctx!.sampleRate * 4;
+      const impulse = this.ctx!.createBuffer(2, length, this.ctx!.sampleRate);
+      for (let i = 0; i < 2; i++) {
+        const channel = impulse.getChannelData(i);
+        for (let j = 0; j < length; j++) {
+           channel[j] = (Math.random() * 2 - 1) * Math.exp(-j / (this.ctx!.sampleRate * 1.5));
+        }
+      }
+      convolver.buffer = impulse;
+      
+      const dryGain = this.ctx!.createGain();
+      dryGain.gain.value = 0.2;
+      const wetGain = this.ctx!.createGain();
+      wetGain.gain.value = 0.8;
+      
+      dryGain.connect(g);
+      convolver.connect(wetGain);
+      wetGain.connect(g);
+      
+      let sourceNodes: AudioBufferSourceNode[] = [];
+      let interval: any;
+      const playAI = () => {
+         if (!this.isPlaying || !this.aiGenBuffer) {
+             interval = setTimeout(playAI, 1000);
+             return;
+         }
+         
+         const source = this.ctx!.createBufferSource();
+         source.buffer = this.aiGenBuffer;
+         
+         // Slow down and pitch down to make it sound "ambient / ethereal"
+         const rate = [0.5, 0.75, 1.0, 1.25][Math.floor(Math.random() * 4)];
+         source.playbackRate.value = rate;
+         
+         // Band-limiting filters to purify noisy microphone input and remove dc-offsets/crackles
+         const hp = this.ctx!.createBiquadFilter();
+         hp.type = 'highpass';
+         hp.frequency.setValueAtTime(200, this.ctx!.currentTime);
+         
+         const lp = this.ctx!.createBiquadFilter();
+         lp.type = 'lowpass';
+         lp.frequency.setValueAtTime(3000, this.ctx!.currentTime);
+         
+         const env = this.ctx!.createGain();
+         env.gain.setValueAtTime(0, this.ctx!.currentTime);
+         env.gain.linearRampToValueAtTime(0.5, this.ctx!.currentTime + 1);
+         env.gain.exponentialRampToValueAtTime(0.001, this.ctx!.currentTime + this.aiGenBuffer.duration / rate + 2);
+         
+         source.connect(hp);
+         hp.connect(lp);
+         lp.connect(env);
+         env.connect(dryGain);
+         env.connect(convolver);
+         
+         source.start(this.ctx!.currentTime);
+         sourceNodes.push(source);
+         
+         // Clean up old nodes
+         source.onended = () => {
+            sourceNodes = sourceNodes.filter(n => n !== source);
+         };
+
+         interval = setTimeout(playAI, (this.aiGenBuffer.duration / rate) * 500 + Math.random() * 2000);
+      };
+      
+      (g as any).customStart = playAI;
+      (g as any).customStop = () => {
+         clearTimeout(interval);
+         sourceNodes.forEach(n => {
+           try { n.stop() } catch(e){}
+         });
+         sourceNodes = [];
+      };
+      return g;
+    };
   }
 
   private trackNodes: Record<string, AudioNode> = {};
+  public aiGenBuffer: AudioBuffer | null = null;
+  
+  public async generateAITrackFromMic(): Promise<void> {
+    if (!this.ctx) await this.init();
+    
+    return new Promise((resolve, reject) => {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            const mediaRecorder = new MediaRecorder(stream);
+            const audioChunks: Blob[] = [];
+
+            mediaRecorder.addEventListener("dataavailable", event => {
+              audioChunks.push(event.data);
+            });
+
+            mediaRecorder.addEventListener("stop", async () => {
+              stream.getTracks().forEach(track => track.stop());
+              const audioBlob = new Blob(audioChunks);
+              const arrayBuffer = await audioBlob.arrayBuffer();
+              const audioCtx = this.ctx || new (window.AudioContext || (window as any).webkitAudioContext)();
+              const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+              this.aiGenBuffer = audioBuffer;
+              resolve();
+            });
+
+            mediaRecorder.start();
+            // Record for 3 seconds
+            setTimeout(() => {
+              mediaRecorder.stop();
+            }, 3000);
+        }).catch(err => reject(err));
+    });
+  }
 
   start() {
     if (!this.ctx || this.isPlaying) return;

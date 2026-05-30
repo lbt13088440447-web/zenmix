@@ -15,5 +15,6 @@ export const TRACKS: TrackDefinition[] = [
   { id: 'birds', name: '鸟鸣', description: '遥远森林鸟鸣', defaultVolume: 0.4 },
   { id: 'warm_pad', name: '温暖绒音', description: '柔和的合成和弦', defaultVolume: 0.4 },
   { id: 'flute', name: '空灵长笛', description: '悠远木管旋律', defaultVolume: 0.4 },
-  { id: 'strings', name: '古典弦乐', description: '悠扬的提琴合奏', defaultVolume: 0.4 }
+  { id: 'strings', name: '古典弦乐', description: '悠扬的提琴合奏', defaultVolume: 0.4 },
+  { id: 'ai_gen', name: 'AI 环境音轨', description: '基于麦克风环境音生成', defaultVolume: 0.6 }
 ];

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Share2, Waves, Bell, Wind, Brain, Droplet, X, GripHorizontal, Link2, Bird, Activity, Grid3X3, SlidersHorizontal, Cloud, Feather, Music } from 'lucide-react';
+import { Play, Pause, Share2, Waves, Bell, Wind, Brain, Droplet, X, GripHorizontal, Link2, Bird, Activity, Grid3X3, SlidersHorizontal, Cloud, Feather, Music, Sparkles, Mic } from 'lucide-react';
 import { engine } from './audio';
 import { TRACKS } from './types';
 import { Visualizer } from './Visualizer';
@@ -14,16 +14,27 @@ const IconMap: Record<string, React.ReactNode> = {
   'birds': <Bird className="w-5 h-5" />,
   'warm_pad': <Cloud className="w-5 h-5" />,
   'flute': <Feather className="w-5 h-5" />,
-  'strings': <Music className="w-5 h-5" />
+  'strings': <Music className="w-5 h-5" />,
+  'ai_gen': <Sparkles className="w-5 h-5" />
 };
 
 export default function App() {
   const [activeMode, setActiveMode] = useState<'mixer' | 'sequencer'>('mixer');
   const [isPlaying, setIsPlaying] = useState(false);
-  const [channels, setChannels] = useState<(string | null)[]>(['drone', 'chimes', null, null]);
+  const [channels, setChannels] = useState<(string | null)[]>(['flute', 'warm_pad', null, null]);
   const [channelVolumes, setChannelVolumes] = useState<number[]>([0.7, 0.4, 0.5, 0.5]);
-  const [showToast, setShowToast] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean; msg: string; isError?: boolean }>({
+    show: false,
+    msg: '',
+    isError: false
+  });
+  const [isRecordingAI, setIsRecordingAI] = useState(false);
   const initRef = useRef(false);
+
+  const triggerToast = (msg: string, isError = false) => {
+    setToast({ show: true, msg, isError });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
+  };
 
   useEffect(() => {
     const hash = window.location.hash.replace('#', '');
@@ -121,8 +132,33 @@ export default function App() {
     const vStr = channelVolumes.map(v => v.toFixed(2)).join(',');
     const url = `${window.location.origin}${window.location.pathname}#c=${cStr}&v=${vStr}`;
     navigator.clipboard.writeText(url);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    triggerToast('混音链接已复制到剪贴板！');
+  };
+
+  const handleAIGenerate = async () => {
+    if (isRecordingAI) return;
+    setIsRecordingAI(true);
+    try {
+      await engine.generateAITrackFromMic();
+      // automatically add the ai_gen track to the first empty slot if possible
+      const emptyIndex = channels.findIndex(c => c === null);
+      if (emptyIndex !== -1) {
+         const newChannels = [...channels];
+         newChannels[emptyIndex] = 'ai_gen';
+         setChannels(newChannels);
+         engine.setTrackVolume('ai_gen', channelVolumes[emptyIndex]);
+      }
+      triggerToast('AI 环境音轨生成成功！已经自动添加到混音面板中。');
+    } catch (e: any) {
+      console.error("AI Generation failed:", e);
+      let errorMsg = '无法访问麦克风或生成失败，请确认已授予麦克风权限。';
+      if (e.name === 'NotAllowedError' || e.message?.toLowerCase().includes('permission denied')) {
+        errorMsg = '麦克风权限被拒绝，请在浏览器地址栏左侧（锁标志）允许使用麦克风。';
+      }
+      triggerToast(errorMsg, true);
+    } finally {
+      setIsRecordingAI(false);
+    }
   };
 
   return (
@@ -195,11 +231,11 @@ export default function App() {
         {activeMode === 'mixer' ? (
           <>
             {/* Mixer Board */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
                {channels.map((trackId, i) => (
                  <div 
                    key={i} 
-                   className="flex flex-col sm:flex-row bg-[#0A0A0A] p-4 rounded-3xl gap-6 items-center border border-white/5 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] relative overflow-hidden group/mixer"
+                   className="flex flex-col sm:flex-row bg-black/20 backdrop-blur-sm p-2.5 rounded-2xl gap-4 items-center border border-white/5 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] relative overflow-hidden group/mixer"
                  >
                {/* Drag and Drop Zone */}
                <div 
@@ -210,34 +246,34 @@ export default function App() {
                      e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-500/10'); 
                      handleDrop(e, i); 
                   }}
-                  className="w-full sm:w-48 h-20 sm:h-24 rounded-2xl border border-dashed border-white/15 flex flex-col items-center justify-center relative shrink-0 transition-all group z-10"
+                  className="w-full sm:w-40 h-16 sm:h-20 rounded-xl border border-dashed border-white/15 flex flex-col items-center justify-center relative shrink-0 transition-all group z-10"
                >
                  {trackId ? (
                      <>
-                       <div className="absolute inset-0 bg-indigo-500/10 rounded-2xl pointer-events-none" />
-                       <div className={`flex flex-col items-center gap-2 z-10 transition-transform ${isPlaying ? 'scale-105' : ''}`}>
+                       <div className="absolute inset-0 bg-indigo-500/10 rounded-xl pointer-events-none" />
+                       <div className={`flex flex-col items-center gap-1 z-10 transition-transform ${isPlaying ? 'scale-105' : ''}`}>
                           <div className={isPlaying && trackId ? 'text-indigo-400 animate-pulse' : 'text-gray-400'}>
                              {IconMap[trackId]}
                           </div>
-                          <span className="text-sm font-medium text-white tracking-wide">{TRACKS.find(t => t.id === trackId)?.name}</span>
+                          <span className="text-xs font-medium text-white tracking-wide">{TRACKS.find(t => t.id === trackId)?.name}</span>
                        </div>
                        <button 
                           onClick={() => clearChannel(i)}
-                          className="absolute -top-2 -right-2 bg-red-500/90 hover:bg-red-500 text-white rounded-full p-1.5 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-md"
+                          className="absolute -top-1 -right-1 bg-red-500/90 hover:bg-red-500 text-white rounded-full p-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-md scale-90"
                        >
                           <X size={12} />
                        </button>
                      </>
                  ) : (
-                     <div className="flex flex-col items-center gap-2 text-white/30 font-medium text-[10px] tracking-widest uppercase">
-                       <GripHorizontal size={18} className="text-white/20" />
+                     <div className="flex flex-col items-center gap-1 text-white/30 font-medium text-[10px] tracking-widest uppercase">
+                       <GripHorizontal size={16} className="text-white/20" />
                        <span>拖拽音源至此</span>
                      </div>
                  )}
                </div>
                
                {/* Volume Slider Section */}
-               <div className={`flex-1 w-full relative flex items-center h-12 transition-opacity duration-500 pb-2 sm:pb-0 ${trackId ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+               <div className={`flex-1 w-full relative flex items-center h-10 transition-opacity duration-500 pb-2 sm:pb-0 ${trackId ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
                   <div className="absolute w-full h-1.5 bg-white/5 rounded-full pointer-events-none shadow-inner overflow-hidden">
                      <div 
                         className="absolute top-0 left-0 h-full bg-gradient-to-r from-indigo-500 to-purple-400 rounded-full transition-all duration-75"
@@ -252,13 +288,13 @@ export default function App() {
                      className="absolute w-full h-full opacity-0 cursor-pointer" 
                      disabled={!trackId}
                   />
-                  <div className="absolute -bottom-2 sm:-bottom-4 left-0 right-0 flex justify-between px-1 pointer-events-none">
-                      <span className="text-[9px] text-white/20 font-mono tracking-widest">静音</span>
-                      <span className="text-[9px] text-white/20 font-mono tracking-widest">最大</span>
+                  <div className="absolute -bottom-1.5 sm:-bottom-3 left-0 right-0 flex justify-between px-1 pointer-events-none">
+                      <span className="text-[8px] text-white/20 font-mono tracking-widest">静音</span>
+                      <span className="text-[8px] text-white/20 font-mono tracking-widest">最大</span>
                   </div>
                </div>
                
-               <div className={`hidden sm:block w-12 text-right font-mono text-xs transition-opacity duration-300 ${trackId ? 'text-gray-400' : 'text-gray-700'}`}>
+               <div className={`hidden sm:block w-10 text-right font-mono text-[10px] transition-opacity duration-300 ${trackId ? 'text-gray-400' : 'text-gray-700'}`}>
                   {trackId ? Math.round(channelVolumes[i] * 100) : '00'}
                </div>
              </div>
@@ -266,7 +302,7 @@ export default function App() {
         </div>
 
         {/* Inventory Shelf */}
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl mt-4">
+        <div className="bg-black/20 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-sm mt-4 relative z-10">
             <h2 className="text-white/30 text-xs font-semibold tracking-[0.2em] mb-6 text-center">可用音源库</h2>
             <div className="flex flex-wrap gap-4 justify-center">
                 {TRACKS.map(t => {
@@ -293,7 +329,30 @@ export default function App() {
                     );
                 })}
             </div>
-            <p className="text-center text-white/20 text-xs mt-8">将音源卡片拖拽至上方混音轨道</p>
+            <p className="text-center text-white/20 text-xs mt-8 mb-6">将音源卡片拖拽至上方混音轨道</p>
+            <div className="flex justify-center border-t border-white/5 pt-6 mt-2">
+                <button
+                    onClick={handleAIGenerate}
+                    disabled={isRecordingAI}
+                    className={`flex items-center gap-3 px-6 py-3 rounded-full border border-indigo-500/30 transition-all shadow-[0_0_15px_rgba(99,102,241,0.2)] ${
+                        isRecordingAI 
+                        ? 'bg-indigo-500/20 text-indigo-300 cursor-wait animate-pulse'
+                        : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-400 hover:scale-105 active:scale-95'
+                    }`}
+                >
+                    {isRecordingAI ? (
+                        <>
+                            <Mic size={18} className="animate-bounce" />
+                            <span className="text-sm font-medium tracking-wider">正在感知环境音... (3秒)</span>
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles size={18} />
+                            <span className="text-sm font-medium tracking-wider">开启 AI 环境音灵感 (Beta)</span>
+                        </>
+                    )}
+                </button>
+            </div>
         </div>
         </>
         ) : (
@@ -304,11 +363,15 @@ export default function App() {
 
       {/* Toast Notification */}
       <div 
-        className={`fixed bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full shadow-2xl font-medium tracking-wide text-sm transition-all duration-500 z-50 ${
-          showToast ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
+        className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl font-medium tracking-wide text-sm transition-all duration-500 z-50 flex items-center gap-2 border ${
+          toast.isError 
+            ? 'bg-red-950/90 text-red-200 border-red-500/30' 
+            : 'bg-indigo-950/90 text-indigo-100 border-indigo-500/30'
+        } ${
+          toast.show ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
         }`}
       >
-        混音链接已复制到剪贴板！
+        {toast.msg}
       </div>
     
     </div>
@@ -361,7 +424,7 @@ function SequencerView({ initRef }: { initRef: React.MutableRefObject<boolean> }
   };
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl flex flex-col gap-8 shadow-2xl">
+    <div className="bg-black/20 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-sm flex flex-col gap-8 shadow-2xl relative z-10">
       <div className="flex flex-col sm:flex-row justify-between items-center border-b border-white/10 pb-6 gap-6">
         <div className="flex items-center gap-6">
           <button
