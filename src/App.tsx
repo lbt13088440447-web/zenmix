@@ -302,9 +302,9 @@ export default function App() {
         </div>
 
         {/* Inventory Shelf */}
-        <div className="bg-black/20 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-sm mt-4 relative z-10">
-            <h2 className="text-white/30 text-xs font-semibold tracking-[0.2em] mb-6 text-center">可用音源库</h2>
-            <div className="flex flex-wrap gap-4 justify-center">
+        <div className="bg-black/25 border border-white/10 rounded-2xl p-4 sm:p-6 mt-3 relative z-10">
+            <h2 className="text-white/30 text-xs font-semibold tracking-[0.2em] mb-4 text-center text-xs tracking-[0.2em]">可用音源库</h2>
+            <div className="flex flex-wrap gap-2 justify-center">
                 {TRACKS.map(t => {
                     const inUse = channels.includes(t.id);
                     return (
@@ -312,29 +312,29 @@ export default function App() {
                             key={t.id}
                             draggable={!inUse}
                             onDragStart={(e) => handleDragStart(e, t.id)}
-                            className={`px-4 sm:px-5 py-3 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 border transition-all ${
+                            className={`px-2.5 py-1.5 sm:px-4 sm:py-2.5 rounded-xl flex items-center gap-2 sm:gap-3 border transition-all ${
                                 inUse 
                                 ? 'border-transparent bg-white/5 text-white/20 cursor-not-allowed opacity-50'
-                                : 'border-white/10 bg-white/5 text-white cursor-grab hover:bg-white/10 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl active:scale-95 active:cursor-grabbing'
+                                : 'border-white/10 bg-white/5 text-white cursor-grab hover:bg-white/10 hover:border-white/20 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 active:cursor-grabbing'
                             }`}
                         >
-                            <div className={`${inUse ? 'opacity-30' : 'text-indigo-400'}`}>
+                            <div className={`${inUse ? 'opacity-30' : 'text-indigo-400'} scale-90 sm:scale-100`}>
                                {IconMap[t.id]}
                             </div>
                             <div className="flex flex-col">
-                               <span className="font-medium text-sm tracking-wide leading-tight">{t.name}</span>
-                               <span className="text-[10px] text-white/40 tracking-wider hidden sm:block mt-1">{t.description}</span>
+                               <span className="font-medium text-xs sm:text-sm tracking-wide leading-tight">{t.name}</span>
+                               <span className="text-[9px] text-white/40 tracking-wider hidden md:block mt-0.5">{t.description}</span>
                             </div>
                         </div>
                     );
                 })}
             </div>
-            <p className="text-center text-white/20 text-xs mt-8 mb-6">将音源卡片拖拽至上方混音轨道</p>
-            <div className="flex justify-center border-t border-white/5 pt-6 mt-2">
+            <p className="text-center text-white/20 text-xs mt-4 mb-4">将音源卡片拖拽至上方混音轨道</p>
+            <div className="flex justify-center border-t border-white/5 pt-4 mt-1">
                 <button
                     onClick={handleAIGenerate}
                     disabled={isRecordingAI}
-                    className={`flex items-center gap-3 px-6 py-3 rounded-full border border-indigo-500/30 transition-all shadow-[0_0_15px_rgba(99,102,241,0.2)] ${
+                    className={`flex items-center gap-3 px-5 py-2.5 rounded-full border border-indigo-500/30 transition-all shadow-[0_0_15px_rgba(99,102,241,0.2)] ${
                         isRecordingAI 
                         ? 'bg-indigo-500/20 text-indigo-300 cursor-wait animate-pulse'
                         : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-400 hover:scale-105 active:scale-95'
@@ -342,13 +342,13 @@ export default function App() {
                 >
                     {isRecordingAI ? (
                         <>
-                            <Mic size={18} className="animate-bounce" />
-                            <span className="text-sm font-medium tracking-wider">正在感知环境音... (3秒)</span>
+                            <Mic size={16} className="animate-bounce" />
+                            <span className="text-xs sm:text-sm font-medium tracking-wider">正在感知环境音... (8秒)</span>
                         </>
                     ) : (
                         <>
-                            <Sparkles size={18} />
-                            <span className="text-sm font-medium tracking-wider">开启 AI 环境音灵感 (Beta)</span>
+                            <Sparkles size={16} />
+                            <span className="text-xs sm:text-sm font-medium tracking-wider">开启 AI 环境音灵感 (Beta)</span>
                         </>
                     )}
                 </button>

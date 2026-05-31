@@ -732,7 +732,7 @@ export class AudioEngine {
             // Record for 3 seconds
             setTimeout(() => {
               mediaRecorder.stop();
-            }, 3000);
+            }, 8000);
         }).catch(err => reject(err));
     });
   }
