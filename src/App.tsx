@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Share2, Waves, Bell, Wind, Brain, Droplet, X, GripHorizontal, Link2, Bird, Activity, Grid3X3, SlidersHorizontal, Cloud, Feather, Music, Sparkles, Mic } from 'lucide-react';
+import { Play, Pause, Share2, Waves, Bell, Wind, Brain, Droplet, X, GripHorizontal, Link2, Bird, Activity, Grid3X3, SlidersHorizontal, Cloud, Feather, Music, Sparkles, Mic, ChevronLeft, ChevronRight } from 'lucide-react';
 import { engine } from './audio';
 import { TRACKS } from './types';
 import { Visualizer } from './Visualizer';
@@ -30,6 +30,81 @@ export default function App() {
   });
   const [isRecordingAI, setIsRecordingAI] = useState(false);
   const initRef = useRef(false);
+
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [swipeEdge, setSwipeEdge] = useState<'left' | 'right' | null>(null);
+  
+  useEffect(() => {
+    let startX = 0;
+    let currentX = 0;
+    let swiping = false;
+    let edge: 'left' | 'right' | null = null;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const x = e.touches[0].clientX;
+      if (x < 30) {
+        edge = 'left';
+        startX = x;
+        swiping = true;
+        setIsSwiping(true);
+        setSwipeEdge('left');
+      } else if (window.innerWidth - x < 30) {
+        edge = 'right';
+        startX = x;
+        swiping = true;
+        setIsSwiping(true);
+        setSwipeEdge('right');
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!swiping) return;
+      currentX = e.touches[0].clientX;
+      
+      let offset = 0;
+      if (edge === 'left') {
+        offset = Math.max(0, currentX - startX);
+      } else if (edge === 'right') {
+        offset = Math.max(0, startX - currentX);
+      }
+      setSwipeOffset(Math.min(offset, 100)); 
+    };
+
+    const handleTouchEnd = () => {
+      if (!swiping) return;
+      
+      let moved = 0;
+      if (edge === 'left') {
+        moved = currentX - startX;
+      } else if (edge === 'right') {
+        moved = startX - currentX;
+      }
+      
+      if (moved > 60) {
+        if (edge === 'left') {
+          window.history.back();
+        } else {
+          window.history.forward();
+        }
+      }
+      
+      swiping = false;
+      setIsSwiping(false);
+      setSwipeEdge(null);
+      setSwipeOffset(0);
+    };
+
+    window.addEventListener('touchstart', handleTouchStart);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, []);
 
   const triggerToast = (msg: string, isError = false) => {
     setToast({ show: true, msg, isError });
@@ -164,6 +239,32 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#050505] text-gray-200 flex flex-col items-center p-6 relative overflow-x-hidden pt-12 md:pt-20">
       
+      {/* Edge Swipe Back Indicator (Left) */}
+      <div 
+        className={`fixed left-0 top-1/2 z-50 flex items-center justify-end pr-2 rounded-r-[40px] bg-white/10 backdrop-blur-md border border-white/20 border-l-0 pointer-events-none ${isSwiping && swipeEdge === 'left' ? 'transition-none' : 'transition-all duration-300'}`}
+        style={{ 
+          width: '60px', 
+          height: '120px',
+          transform: `translate(${swipeEdge === 'left' ? swipeOffset - 60 : -60}px, -50%)`,
+          opacity: isSwiping && swipeEdge === 'left' ? Math.min(swipeOffset / 40, 1) : 0 
+        }}
+      >
+        <ChevronLeft size={28} className={swipeOffset > 60 ? 'text-white scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'text-white/50'} style={{ transition: 'all 0.2s ease-out' }} />
+      </div>
+
+      {/* Edge Swipe Forward Indicator (Right) */}
+      <div 
+        className={`fixed right-0 top-1/2 z-50 flex items-center justify-start pl-2 rounded-l-[40px] bg-white/10 backdrop-blur-md border border-white/20 border-r-0 pointer-events-none ${isSwiping && swipeEdge === 'right' ? 'transition-none' : 'transition-all duration-300'}`}
+        style={{ 
+          width: '60px', 
+          height: '120px',
+          transform: `translate(${swipeEdge === 'right' ? 60 - swipeOffset : 60}px, -50%)`,
+          opacity: isSwiping && swipeEdge === 'right' ? Math.min(swipeOffset / 40, 1) : 0 
+        }}
+      >
+        <ChevronRight size={28} className={swipeOffset > 60 ? 'text-white scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'text-white/50'} style={{ transition: 'all 0.2s ease-out' }} />
+      </div>
+
       {/* Visualizer Background */}
       <Visualizer />
 
